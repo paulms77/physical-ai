@@ -166,6 +166,23 @@ foundation models onto mobile hardware.
 
 <br clear="all">
 
+### Hardware
+
+The sensor is an **iPhone 12 Pro** (iOS 26.5.2) — A14 Bionic, 12 MP rear camera,
+and a LiDAR scanner, which makes `ARKit sceneDepth` available as a 256×192 dense
+depth map with a confidence map every frame.
+
+Compute is split across two machines; see
+[On compute](#on-compute--two-machines-one-weight-file). iOS development happens
+on a separate macOS machine with an Apple Developer Program membership, so
+development builds do not expire every seven days — which matters when a demo is
+scheduled.
+
+Python environments are created per machine with `uv`, inside the project folder
+rather than against the system Python, with separate requirements files: CUDA
+torch on the training server, CPU torch plus `onnxruntime` (or OpenVINO) on the
+laptop.
+
 ### Transport
 
 The laptop is discovered automatically over Bonjour (`NWListener` / `NWBrowser`)
@@ -182,9 +199,9 @@ for evaluation rather than for the live loop.
 
 ### Detection
 
-On a 16 GB M1 the realistic choices are **YOLO-World** or **OWLv2-base**.
-Grounding DINO scores better but runs at 1–3 FPS on MPS, which does not fit a
-live demo.
+On a CPU-only laptop the realistic choices are **YOLOE** or **YOLO-World** in
+prompt-then-detect mode, converted to ONNX. Grounding DINO scores better but is
+far too slow to drive a live demo without a GPU.
 
 Detection does not run every frame. It runs at **2–5 Hz with tracking in
 between**. This saves compute, and it also damps the 3D coordinate against a
@@ -490,6 +507,9 @@ docs/              architecture, per-phase notes, runbook, voice control
 config/            phase0.yaml — host/port, mock generator settings
 ```
 
+The original Korean design document — the full reasoning behind every choice
+here — is at [`docs/README.ko.md`](docs/README.ko.md).
+
 Further reading in `docs/`: [`ARCHITECTURE_v2.md`](docs/ARCHITECTURE_v2.md),
 [`PHASE0.md`](docs/PHASE0.md), [`PHASE1.md`](docs/PHASE1.md),
 [`REALTIME.md`](docs/REALTIME.md), [`RUNBOOK.md`](docs/RUNBOOK.md),
@@ -528,34 +548,48 @@ detectors and both localization methods under fixed scenarios. ⬜
 > Foxglove attaches to rosbridge over WebSocket as a native app and sidesteps the
 > problem entirely.
 
-### On compute
+### On compute — two machines, one weight file
 
-There is no NVIDIA GPU here — but there is a GPU. The M1's 8-core integrated GPU
-is reachable through PyTorch's MPS backend, and the 16-core Neural Engine through
-CoreML.
+Training and inference are **physically separated**, which is the single
+biggest design decision in the project.
 
-| Model | Throughput on M1 |
-| --- | --- |
-| YOLOv11n (MPS) | 15–25 FPS |
-| YOLOv11n (CoreML / Neural Engine) | 30+ FPS |
-| YOLO-World | 5–10 FPS |
-| OWLv2-base | 1–3 FPS |
-| MobileSAM | 10–20 FPS |
-| SAM2-tiny | 5–10 FPS |
-| Depth Anything V2 (small) | 5–10 FPS |
+| | Training server | Inference laptop |
+| --- | --- | --- |
+| Hardware | RTX A6000 ×2 (48 GB each), 32 cores, 125 GB RAM | **no GPU** |
+| OS | Ubuntu 20.04.6 LTS | Ubuntu |
+| Role | fine-tuning, auto-labelling, ONNX/OpenVINO conversion — **offline only** | the entire real-time demo: detection, depth, transforms, ROS2 |
+| Network | behind a corporate network; external devices cannot reach it | same Wi-Fi as the iPhone |
 
-The slowest, OWLv2 at 1–3 FPS, **is not a problem, because detection was already
-designed to run at 2–5 Hz** with the tracker filling the gaps. A design choice
-made to save compute happens to absorb the GPU constraint entirely.
+**The only thing crossing between them is a weight file** — one `scp` or USB
+copy. The training server never appears on the network during a demo. The live
+data channel exists solely between iPhone and laptop.
 
-16 GB of unified memory is in some ways an advantage over a dedicated 8 GB VRAM
-card — larger models fit — though it is shared with the OS. The caveat is that
-some operators fall back to CPU under MPS; `PYTORCH_ENABLE_MPS_FALLBACK=1` keeps
-things running but slowly, so MPS compatibility is worth checking when choosing a
-model.
+So the real question is not "can a GPU run this" but **can a CPU-only laptop run
+open-vocabulary detection in real time**. Three things make that work:
 
-Training is light. The Phase 3 fine-tune is YOLOv11n on 300–500 images for 100
-epochs — 20–40 minutes on an M1. **No foundation model is being trained here.**
+1. **prompt-then-detect** — YOLOE and YOLO-World bake the text embedding into
+   the model once the target vocabulary is fixed, after which they behave like
+   an ordinary CNN detector. Open-vocabulary flexibility is kept, but the speed
+   is plain-YOLO speed. With roughly ten demo objects, this fits perfectly.
+2. **ONNX Runtime / OpenVINO** — converting and quantising out of PyTorch into a
+   CPU-targeted runtime buys a 2–4× speedup.
+3. **Detection at 2–5 Hz with tracker interpolation** — the design that was
+   already there to save compute absorbs the CPU constraint for free.
+
+That third point is worth restating: the cadence was chosen early for a
+different reason, and it is what makes a GPU-less demo viable at all.
+
+ROS2 attaches to the inference laptop. Being on Ubuntu, native installation is
+the straightforward path — the RoboStack and Docker workarounds that macOS would
+have forced are simply unnecessary.
+
+> An earlier revision of this project ran everything on a single MacBook Air M1
+> via the PyTorch MPS backend. The current two-machine split replaced it on
+> 2026-09-16. The Korean design document in
+> [`docs/README.ko.md`](docs/README.ko.md) records both.
+
+Training is light either way. The Phase 3 fine-tune is YOLOv11n on 300–500
+images for 100 epochs. **No foundation model is being trained here.**
 
 ### If Phase 3 fine-tunes
 
@@ -580,8 +614,13 @@ comparison axis.**
   "closed-set vs open-vocab" into "distillation quality".
 
 ```bash
+# on the training server (GPU 1 only — GPU 0 is occupied by another service)
+CUDA_VISIBLE_DEVICES=1 \
 yolo detect train model=yolo11n.pt data=desk.yaml epochs=100 imgsz=640 \
-     device=mps patience=20
+     device=0 patience=20
+
+# then export for CPU inference and copy the weights to the laptop
+yolo export model=runs/detect/train/weights/best.pt format=onnx
 ```
 
 Default augmentation is fine, except turn off horizontal flip if objects carry
