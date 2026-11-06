@@ -10,6 +10,14 @@ The phone is only a sensor. It streams RGB frames, camera intrinsics and ARKit
 lifts the detection to a metric 3D point, and converts it into the robot's
 `base_link` frame as a pick target.
 
+![Live demo — prompt switches from "laptop computer" to "cup"; both cups are detected, each gets a world coordinate, and the 3D view keeps a stable instance ID per object](docs/media/demo.gif)
+
+*Live run. The prompt switches from `"laptop computer"` to `"cup"` mid-session —
+no retraining, no model swap. Left: camera feed with masks and boxes. Centre:
+auto-focus view of the selected target. Right: the 3D view, where `cup23`,
+`cup25` and `cup28` hold stable world coordinates and keep their instance IDs
+as the camera moves. Full clip: [`docs/media/demo.mp4`](docs/media/demo.mp4).*
+
 ---
 
 ## Table of contents
@@ -52,9 +60,14 @@ implemented first, then scored in centimetres against the LiDAR depth. That turn
 
 ### Demo scenario
 
-A desk with a cup and a mouse on it, and a water bottle held in the hand. Saying
-`"bottle"` tracks the bottle; switching to `"cup"` moves to the cup instantly;
-`"cup and mouse"` tracks both at once.
+The clip above is a real run: the prompt starts at `"laptop computer"`, both
+laptops are picked up, then it switches to `"cup"` and both cups are picked up
+instead — same model, same session.
+
+The designed stress-test scenario goes one step further. A desk with a cup and a
+mouse on it, and a water bottle held in the hand. Saying `"bottle"` tracks the
+bottle; switching to `"cup"` moves to the cup instantly; `"cup and mouse"`
+tracks both at once.
 
 Swapping the prompt costs one text-embedding pass — milliseconds. No retraining,
 no model swap. That is the point of going open-vocabulary. Tracking several
@@ -144,10 +157,14 @@ to "it is somewhere in the room".
 └─────────────────────────────────────────────┘
 ```
 
+<img src="docs/media/ios-sensor-app.png" width="300" align="right" alt="PysicalSensor iOS app showing connection state, tracking status, LiDAR availability, frames sent and the voice-control button">
+
 **The phone runs no inference.** It is a sensor gateway and nothing else. That
 split matters twice over: the architecture ends up shaped like a real robot
 system (edge sensors, central compute), and no time is spent squeezing
 foundation models onto mobile hardware.
+
+<br clear="all">
 
 ### Transport
 
@@ -360,6 +377,11 @@ ipconfig getifaddr en0
 source .venv/bin/activate
 python scripts/run_live.py --prompt "cup" --viz --focus
 ```
+
+![rerun viewer running the live pipeline](docs/media/rerun-ui.png)
+
+*The rerun viewer during a live run — camera feed with detections, the
+auto-focus panel, the 3D world view and the per-stream timeline.*
 
 Forgetting `source` is the most common failure: without `.venv/bin` on `PATH`,
 `--viz` fails with `Failed to find Rerun Viewer executable in PATH`.
