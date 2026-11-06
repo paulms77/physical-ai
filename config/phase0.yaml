@@ -1,0 +1,22 @@
+# Phase 0 설정 — 파이프라인 관통
+#
+# 하드코딩을 피하기 위한 값 모음. 데모 환경이 바뀌면 이 파일만 고친다.
+
+# --- WebSocket 수신기 (iPhone → 노트북) ---
+server:
+  host: "0.0.0.0"   # 모든 인터페이스에서 수신 (iPhone이 같은 Wi-Fi에서 접속)
+  port: 8765        # iPhone 앱이 접속할 포트
+
+# --- 시각화 (rerun) ---
+viz:
+  app_id: "pysical_phase0"     # rerun 세션 이름
+  spawn_viewer: true           # 실행 시 rerun 뷰어 창을 자동으로 띄울지
+  camera_trail_length: 200     # 카메라 궤적으로 남길 최근 포즈 개수
+  axis_length_m: 0.1           # 3D 뷰에서 카메라 좌표축을 그릴 길이(미터)
+
+# --- mock 송신기 (iPhone 없이 테스트할 때) ---
+mock:
+  fps: 15               # 초당 보낼 프레임 수
+  duration_s: 20        # 총 송신 시간(초). 0 이면 무한
+  radius_m: 1.0         # 카메라가 그리는 원 궤적 반지름
+  height_m: 1.2         # 카메라 높이(ARKit world Y, 위 방향)

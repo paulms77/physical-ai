@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# 가상환경 (프로젝트 폴더 안에 두지만 git에는 넣지 않는다)
+.venv/
+
+# 중간 산출물 / 녹화 데이터 (용량이 크고 재생성 가능)
+data/recordings/*.rrd
+data/recordings/*.mp4
+data/**/*.npy
+
+# 모델 가중치 (용량 큼, A6000/다운로드로 재확보 가능)
+weights/*.pt
+weights/*.ts
+weights/*.onnx
+weights/*.pb
+weights/hf_cache/
+
+# 데이터/결과 이미지
+data/*.jpg
+data/*.png
+data/*.npy
+
+# Xcode 생성물 (project.yml에서 xcodegen으로 재생성)
+ios_app/*.xcodeproj/
+ios_app/*.xcworkspace/
+ios_app/DerivedData/
+*.xcuserstate
+
+# 로그
+*.log

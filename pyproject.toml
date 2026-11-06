@@ -1,0 +1,17 @@
+[project]
+name = "pysical"
+version = "0.1.0"
+description = "Physical AI — Open-Vocabulary 3D Spatial Perception with ROS2 (Phase 0)"
+requires-python = ">=3.12"
+
+# 실제 런타임 의존성은 단계별로 requirements-phaseN.txt 로 관리한다.
+# (Phase 0 은 requirements-phase0.txt 참고)
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# editable 설치( pip install -e . )를 하면 PYTHONPATH 없이 `import pysical` 이 된다.

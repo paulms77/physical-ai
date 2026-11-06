@@ -1,0 +1,22 @@
+# Phase 0 — 파이프라인 관통 (추론 노트북 / CPU 전용)
+#
+# 이 단계에는 검출 모델이 없다. iPhone → WebSocket 수신 → 포즈 디코드 → rerun 3D 시각화
+# 까지만 필요하므로 무거운 torch/onnxruntime은 아직 넣지 않는다. (Phase 1에서 추가)
+#
+# 설치:  .venv/bin/pip install -r requirements-phase0.txt
+
+# --- 시각화 ---
+rerun-sdk==0.37.2        # 네이티브 3D 뷰어. Phase 0에서 RViz 대신 카메라 궤적을 띄운다.
+
+# --- 네트워크 (iPhone ↔ 노트북 WebSocket) ---
+websockets==13.1         # 순수 파이썬 asyncio WebSocket 서버/클라이언트
+
+# --- 수치 / 영상 ---
+numpy==2.1.3             # 포즈 행렬·좌표 변환 계산
+opencv-python==4.10.0.84 # JPEG 디코딩, 영상 프레임 처리
+                         # ※ Phase 1에서 opencv-contrib-python으로 교체됨(dnn_superres 필요).
+                         #   contrib가 상위집합이라 Phase 0 기능은 그대로 동작한다.
+pillow==11.0.0           # 이미지 보조 처리
+
+# --- 설정 ---
+pyyaml==6.0.2            # config/*.yaml 로딩

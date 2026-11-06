@@ -1,0 +1,30 @@
+# Phase 1 — 인식 + 관측기반 위치추정 (추론 노트북 / CPU 전용)
+#
+# Phase 0 것에 더해 설치한다:  .venv/bin/pip install -r requirements-phase1.txt
+#
+# 주의: 관측기반 표면추정(역투영·RANSAC 평면 fitting)은 NumPy로 직접 구현했으므로
+#       Open3D 같은 무거운 의존성이 필요 없다(docs/ARCHITECTURE_v2.md §1-C 결정).
+#       아래는 '실제 검출/depth 모델'을 붙일 때 필요한 것들이다.
+
+-r requirements-phase0.txt
+
+# --- depth 추론 (CPU, 방법 B) ---
+onnxruntime             # Depth Anything V2(ONNX)를 CPU 추론. 아키텍처 원칙의 핵심 런타임.
+                        # depth 모델: GitHub fabio-sim/Depth-Anything-ONNX releases의
+                        # depth_anything_v2_vits_indoor_dynamic.onnx (사내망 HF CDN 차단 우회).
+
+# --- 검출 (open-vocabulary, prompt-then-detect) ---
+ultralytics             # YOLOE(seg). 지금은 .pt로 검증(하이브리드 방침), 최종은 ONNX export.
+                        # torch(CPU)를 동반한다. 이 노드는 드라이버가 낮아 자동 CPU로 동작.
+
+# 참고: 역투영·RANSAC 평면 fitting은 NumPy 자체 구현이라 Open3D 불필요.
+
+# --- super-resolution 확대 (Focus-and-Refine, docs/REFINE_FINDINGS §7) ---
+# opencv-contrib-python (dnn_superres 포함). 주의: 기본 opencv-python과 공존 불가 —
+# opencv-python을 제거하고 이걸 설치한다(contrib가 상위집합이라 기존 기능 다 포함).
+# ESPCN 모델(.pb)은 GitHub fannymonori/TF-ESPCN에서 weights/에 받는다(~90KB).
+opencv-contrib-python
+
+
+# --- Bonjour 서비스 광고 (iOS 자동 탐색) ---
+zeroconf                # 라이브 수신기가 _pysical._tcp를 광고해 iOS 앱이 자동 연결
